@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Diagnostic Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --panel-bg: rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            /* Wider for advanced stats */
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, #fff, #cbd5e1);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* --- Tabs --- */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 1rem 2rem;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            position: relative;
+            transition: color 0.3s;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- Overview Styles --- */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .info-item {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .label {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .value {
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-dot.online {
+            background-color: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .status-dot.offline {
+            background-color: var(--error);
+            box-shadow: 0 0 10px var(--error);
+        }
+
+        .speedtest-btn {
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            margin: 2rem auto 0;
+            padding: 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .speedtest-btn:hover {
+            background: #565add;
+            transform: translateY(-1px);
+        }
+
+        .speedtest-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        #speed-result {
+            text-align: center;
+            margin-top: 1rem;
+            min-height: 24px;
+        }
+
+        /* --- Advanced Styles --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .card {
+                padding: 1.5rem 1rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .tabs {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .tab-btn {
+                width: 100%;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                padding: 0.8rem;
+            }
+
+            .tab-btn.active::after {
+                display: none;
+            }
+
+            .tab-btn.active {
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 8px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .panel {
+                padding: 1rem;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            /* Specific adjustments for very small screens */
+            @media (max-width: 480px) {
+                .info-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .panel h3 {
+            margin-top: 0;
+            font-size: 1.1rem;
+            color: var(--text-main);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        /* Ping Chart */
+        .chart-container {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+
+        /* System Health */
+        .sys-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+        }
+
+        .sys-val {
+            inherit;
+            font-weight: bold;
+        }
+
+        /* Terminals */
+        .terminal {
+            background: #111;
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 6px;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            margin-bottom: 10px;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Network Dashboard</h1>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('overview')">Overview / Tổng quan</button>
+                <button class="tab-btn" onclick="switchTab('advanced')">Advanced / Nâng cao</button>
+            </div>
+
+            <!-- Tab 1: Overview -->
+            <div id="overview" class="tab-content active">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label">WAN IP <br><small>(Quốc tế)</small></span>
+                        <div class="value" id="wan-ip">Fetching...</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">LAN IP <br><small>(Nội bộ)</small></span>
+                        <div class="value" id="lan-ip">Detecting...</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Connection Type <br><small>(Loại kết nối)</small></span>
+                        <div class="value" id="conn-type">Detecting...</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">DNS Server</span>
+                        <div class="value" id="dns-server">Fetching...</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Internet Status</span>
+                        <div class="value" id="net-status">
+                            <span class="status-dot"></span><span id="status-text">Checking...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 3rem;">
+                    <div id="speed-result"></div>
+                    <button class="speedtest-btn" id="speed-btn">Run Speed Test / Chạy kiểm tra</button>
+                </div>
+            </div>
+
+            <!-- Tab 2: Advanced -->
+            <div id="advanced" class="tab-content">
+                <div class="dashboard-grid">
+                    <!-- Real-time Ping Graph -->
+                    <div class="panel" style="grid-column: span 2;">
+                        <h3>Real-time Latency (ms)</h3>
+                        <div class="chart-container">
+                            <canvas id="pingChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- System Health -->
+                    <div class="panel">
+                        <h3>System Health (Server)</h3>
+                        <div id="sys-health-content">
+                            <div class="sys-item"><span>Hostname:</span> <span class="sys-val"
+                                    id="sys-hostname">-</span></div>
+                            <div class="sys-item"><span>Platform:</span> <span class="sys-val"
+                                    id="sys-platform">-</span></div>
+                            <div class="sys-item"><span>CPU Model:</span> <span class="sys-val" id="sys-cpu">-</span>
+                            </div>
+                            <div class="sys-item"><span>Cores:</span> <span class="sys-val" id="sys-cores">-</span>
+                            </div>
+                            <div class="sys-item"><span>RAM Usage:</span> <span class="sys-val" id="sys-ram">-</span>
+                            </div>
+                            <div class="sys-item"><span>Uptime:</span> <span class="sys-val" id="sys-uptime">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Management -->
+                    <div class="panel">
+                        <h3>System Management</h3>
+                        <div class="sys-item" style="display:block; margin-bottom:15px">
+                            <span class="label" style="display:inline; color:#ccc;">Rename PC / Đổi tên máy:</span>
+                            <div style="display:flex; gap:10px; margin-top:5px">
+                                <input type="text" id="new-hostname" placeholder="New Name" style="
+                                    background: rgba(0,0,0,0.3); border:1px solid #444; color:white; padding:5px 10px; border-radius:5px; flex:1
+                                ">
+                                <button class="action-btn" onclick="renameComputer()"
+                                    style="background:#6366f1">Apply</button>
+                            </div>
+                            <small style="color:#64748b; font-size:0.75rem; margin-top:5px; display:block"> Requires
+                                Admin Rights & Restart (Cần quyền Admin & Khởi động lại)</small>
+                        </div>
+                    </div>
+
+                    <!-- Port Scanner -->
+                    <div class="panel">
+                        <h3>Port Scanner (Localhost)</h3>
+                        <button class="action-btn" id="scan-btn" onclick="runPortScan()">Scan Common Ports</button>
+                        <div class="terminal" id="port-output" style="height: 115px; margin-top: 10px;">Waiting to
+                            scan...</div>
+                    </div>
+
+                    <!-- Traceroute -->
+                    <div class="panel" style="grid-column: span 2;">
+                        <h3>Traceroute (to 8.8.8.8)</h3>
+                        <button class="action-btn" id="trace-btn" onclick="runTraceroute()">Run Trace Route</button>
+                        <div class="terminal" id="trace-output" style="margin-top: 10px;">Click 'Run' to start tracing
+                            route...</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

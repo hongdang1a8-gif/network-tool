@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Environment variables & Secrets
+.env
+service-account.json
+
+# Logs
+npm-debug.log*
+
+# OS specific
+.DS_Store
+Thumbs.db
