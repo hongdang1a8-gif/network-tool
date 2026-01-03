@@ -48,6 +48,17 @@ Yêu cầu: Máy tính đã cài **Node.js** (v14 trở lên).
 
 ---
 
+## 📦 Phiên Bản Portable (.exe)
+
+Nếu bạn muốn chạy tool tool trên máy khác mà không cần cài Node.js:
+1.  Tìm file `network-tool.exe` trong thư mục dự án.
+2.  Copy file `.exe` này và file `service-account.json` sang máy cần chạy.
+3.  Để chung 2 file này trong cùng một thư mục.
+4.  Chạy file `.exe` (Cần Run as admin để dùng tính năng Rename).
+5.  Truy cập `http://localhost:3001`.
+
+---
+
 ## ☁️ Hướng Dẫn Kết Nối Google Sheets
 
 Để tính năng "Save to Google Sheet" hoạt động, bạn cần cấu hình như sau:

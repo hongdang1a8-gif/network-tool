@@ -3,10 +3,22 @@ const { exec } = require('child_process');
 const os = require('os');
 const dns = require('dns');
 const net = require('net');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 const port = 3001;
 
-app.use(express.static('public'));
+// --- Global Error Handling Wrapper ---
+process.on('uncaughtException', (err) => {
+    console.error('🔥 CRITICAL ERROR:', err);
+    console.log('\nPress any key to exit...');
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.on('data', process.exit.bind(process, 1));
+});
+
+// Robust Path for Public Folder (Handles PKG snapshot vs Local)
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // --- Helper Functions ---
@@ -52,7 +64,7 @@ function getWindowsVersion(release) {
     if (build >= 19044) return "Version 21H2 (Win 10)";
     if (build >= 19043) return "Version 21H1";
 
-    return `Build ${build}`;
+    return `Build ${build} `;
 }
 
 // Check port
@@ -200,7 +212,6 @@ app.get('/api/port-scan', async (req, res) => {
 
 // --- Google Sheets Integration ---
 const { GoogleSpreadsheet } = require('google-spreadsheet');
-const { JWT } = require('google-auth-library');
 
 // TODO: Thay thế bằng ID của Google Sheet bạn (Trong url /spreadsheets/d/<ID>/edit)
 const SPREADSHEET_ID = '1yvDsGwFDHJE7GEiu8OtQxDsRxGdv53TfepeGZQSDN-E';
@@ -209,24 +220,31 @@ app.post('/api/log-sheet', async (req, res) => {
     try {
         // Load Service Account Credentials
         let serviceAccount;
+        // Use process.cwd() to locate service-account.json next to the executable
+        // pkg sets process.cwd() to the folder containing the exe
+        const saPath = path.join(process.cwd(), 'service-account.json');
+
         try {
-            serviceAccount = require('./service-account.json');
+            if (fs.existsSync(saPath)) {
+                serviceAccount = JSON.parse(fs.readFileSync(saPath, 'utf8'));
+            } else {
+                throw new Error("File not found");
+            }
         } catch (e) {
-            return res.status(500).json({ error: "Không tìm thấy file 'service-account.json'. Hãy copy nó vào thư mục dự án." });
+            return res.status(500).json({ error: "Không tìm thấy file 'service-account.json'. Hãy để file này cùng thư mục với file .exe (hoặc source code)." });
         }
 
         if (SPREADSHEET_ID === 'YOUR_SPREADSHEET_ID_HERE') {
             return res.status(400).json({ error: "Chưa cấu hình SPREADSHEET_ID trong server.js" });
         }
 
-        // Auth
-        const serviceAccountAuth = new JWT({
-            email: serviceAccount.client_email,
-            key: serviceAccount.private_key,
-            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-        });
+        // Auth (Google Spreadsheet v4)
+        const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
 
-        const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
+        await doc.useServiceAccountAuth({
+            client_email: serviceAccount.client_email,
+            private_key: serviceAccount.private_key,
+        });
 
         await doc.loadInfo(); // Loads logs
         const sheet = doc.sheetsByIndex[0]; // First sheet
@@ -236,7 +254,7 @@ app.post('/api/log-sheet', async (req, res) => {
             Time: new Date().toLocaleString(),
             Hostname: req.body.hostname || 'N/A',
             OS: req.body.osInfo || 'N/A',
-            ConnectionType: req.body.connectionType || 'N/A',
+            'Wifi/LAN': req.body.connectionType || 'N/A',
             WanIP: req.body.wanIp || 'N/A',
             LanIP: req.body.lanIp || 'N/A',
             Ping: req.body.ping || 'N/A',
@@ -263,7 +281,7 @@ app.post('/api/rename-computer', (req, res) => {
     }
 
     // PowerShell command to rename
-    const cmd = `powershell -Command "Rename-Computer -NewName '${newName}' -Force"`;
+    const cmd = `powershell - Command "Rename-Computer -NewName '${newName}' -Force"`;
 
     exec(cmd, (error, stdout, stderr) => {
         if (error) {
@@ -285,4 +303,9 @@ app.get('/api/speedtest/download', (req, res) => {
 
 app.listen(port, () => {
     console.log(`Server listening at http://localhost:${port}`);
+    console.log("Press Ctrl+C to stop.");
+
+    // Auto-open Browser
+    const startCmd = process.platform === 'win32' ? 'start' : 'open';
+    exec(`${startCmd} http://localhost:${port}`);
 });
